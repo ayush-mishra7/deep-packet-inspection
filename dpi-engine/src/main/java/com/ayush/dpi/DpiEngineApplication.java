@@ -1,9 +1,11 @@
 package com.ayush.dpi;
 
+import com.ayush.dpi.config.DpiProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.context.ConfigurableApplicationContext;
 
 /**
  * Entry point for the DPI Engine application.
@@ -20,10 +22,14 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 public class DpiEngineApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(DpiEngineApplication.class, args);
-        log.info("========================================");
+        ConfigurableApplicationContext ctx = SpringApplication.run(DpiEngineApplication.class, args);
+
+        DpiProperties props = ctx.getBean(DpiProperties.class);
+        log.info("════════════════════════════════════════");
         log.info("  DPI Engine started successfully");
-        log.info("  Port: 8080");
-        log.info("========================================");
+        log.info("  Mode    : {}", props.getMode().toUpperCase());
+        log.info("  Port    : 8080");
+        log.info("  Version : {}", props.getVersion());
+        log.info("════════════════════════════════════════");
     }
 }

@@ -42,8 +42,11 @@ info:
 dpi:
   app-name: DPI Engine
   version: 0.1.0-SNAPSHOT
+  mode: server # "pcap" = process file & exit, "server" = REST API only
   max-workers: 4
   default-action: ALLOW
   capture:
     buffer-size: 65536
     snapshot-length: 65535
+    pcap-file-path: # path to PCAP file (required when mode=pcap)
+    batch-log-interval: 1000 # log progress every N packets

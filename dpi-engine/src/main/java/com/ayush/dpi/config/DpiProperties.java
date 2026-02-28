@@ -21,6 +21,12 @@ public class DpiProperties {
     /** Current application version. */
     private String version = "0.1.0-SNAPSHOT";
 
+    /**
+     * Application mode: "pcap" (process file then exit) or "server" (REST API
+     * only).
+     */
+    private String mode = "server";
+
     /** Maximum number of worker threads for packet processing. */
     private int maxWorkers = 4;
 
@@ -38,5 +44,11 @@ public class DpiProperties {
 
         /** Maximum bytes to capture per packet. */
         private int snapshotLength = 65535;
+
+        /** Path to the PCAP file to process (pcap mode only). */
+        private String pcapFilePath;
+
+        /** Log progress every N packets processed. */
+        private int batchLogInterval = 1000;
     }
 }
