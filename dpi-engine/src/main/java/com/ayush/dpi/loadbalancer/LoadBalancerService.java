@@ -24,15 +24,18 @@ public class LoadBalancerService {
 
     private final DpiProperties properties;
     private final RuleRegistry ruleRegistry;
+    private final com.ayush.dpi.stats.StatsService statsService;
     private WorkerService[] workers;
     private ExecutorService executorService;
     private final AtomicBoolean initialized = new AtomicBoolean(false);
     private final AtomicLong dispatchedCount = new AtomicLong(0);
     private final AtomicLong dropCount = new AtomicLong(0);
 
-    public LoadBalancerService(DpiProperties properties, RuleRegistry ruleRegistry) {
+    public LoadBalancerService(DpiProperties properties, RuleRegistry ruleRegistry,
+            com.ayush.dpi.stats.StatsService statsService) {
         this.properties = properties;
         this.ruleRegistry = ruleRegistry;
+        this.statsService = statsService;
     }
 
     public void init() {
@@ -56,7 +59,7 @@ public class LoadBalancerService {
         });
 
         for (int i = 0; i < workerCount; i++) {
-            workers[i] = new WorkerService(i, queueCapacity, ruleRegistry);
+            workers[i] = new WorkerService(i, queueCapacity, ruleRegistry, statsService);
             executorService.submit(workers[i]);
         }
 

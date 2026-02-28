@@ -31,9 +31,13 @@ public class WorkerService implements Runnable {
     private final int workerId;
     private final LinkedBlockingQueue<ParsedPacket> queue;
     private final Map<String, Connection> connections = new HashMap<>();
-    private final AtomicLong processedCount = new AtomicLong(0);
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final RuleRegistry ruleRegistry;
+    private final com.ayush.dpi.stats.StatsService statsService;
+    private final com.ayush.dpi.stats.WorkerLocalStats localStats = new com.ayush.dpi.stats.WorkerLocalStats();
+
+    // Flush to global StatsService every N packets to minimize contention
+    private static final int STATS_FLUSH_INTERVAL = 1000;
 
     private static final ParsedPacket POISON_PILL = ParsedPacket.builder()
             .srcIp("0.0.0.0").destIp("0.0.0.0")
@@ -42,10 +46,15 @@ public class WorkerService implements Runnable {
             .packetSize(0).sequenceNumber(-1)
             .build();
 
-    public WorkerService(int workerId, int queueCapacity, RuleRegistry ruleRegistry) {
+    // Need to keep a running total because localStats resets on flush
+    private final AtomicLong totalProcessedCount = new AtomicLong(0);
+
+    public WorkerService(int workerId, int queueCapacity, RuleRegistry ruleRegistry,
+            com.ayush.dpi.stats.StatsService statsService) {
         this.workerId = workerId;
         this.queue = new LinkedBlockingQueue<>(queueCapacity);
         this.ruleRegistry = ruleRegistry;
+        this.statsService = statsService;
     }
 
     public boolean enqueue(ParsedPacket packet) {
@@ -77,20 +86,23 @@ public class WorkerService implements Runnable {
             }
         }
 
+        // Final flush on shutdown
+        flushStats();
+
         log.info("Worker-{} stopped — processed {} packets, {} connections tracked",
-                workerId, processedCount.get(), connections.size());
+                workerId, localStats.getPacketsProcessed(), connections.size());
     }
 
     private void processPacket(ParsedPacket packet) {
         String key = FiveTupleHasher.computeKey(packet);
-        long count = processedCount.incrementAndGet();
+        totalProcessedCount.incrementAndGet();
 
         // Update connection tracking
         Connection conn = connections.get(key);
         if (conn == null) {
             conn = new Connection(key, packet);
             connections.put(key, conn);
-            log.debug("Worker-{} | NEW connection: {} (packet #{})", workerId, key, count);
+            log.debug("Worker-{} | NEW connection: {}", workerId, key);
         } else {
             conn.updateWith(packet);
         }
@@ -99,12 +111,24 @@ public class WorkerService implements Runnable {
         Decision decision = evaluateRules(packet, conn);
         conn.setLastDecision(decision);
 
+        // Record metrics locally
+        localStats.record(packet, decision);
+
+        // Periodic flush to avoid overwhelming central StatsService
+        if (localStats.getPacketsProcessed() % STATS_FLUSH_INTERVAL == 0) {
+            flushStats();
+        }
+
         if (decision != Decision.ALLOW) {
             log.info("Worker-{} | {} | connection={} | pkts={} bytes={}",
                     workerId, decision, key, conn.getPacketCount(), conn.getBytesTransferred());
-        } else {
-            log.debug("Worker-{} | ALLOW | connection={} | pkts={} bytes={}",
-                    workerId, key, conn.getPacketCount(), conn.getBytesTransferred());
+        }
+    }
+
+    private void flushStats() {
+        if (localStats.getPacketsProcessed() > 0) {
+            statsService.recordMetrics(localStats);
+            localStats.reset();
         }
     }
 
@@ -121,7 +145,7 @@ public class WorkerService implements Runnable {
     }
 
     public long getProcessedCount() {
-        return processedCount.get();
+        return totalProcessedCount.get();
     }
 
     public Map<String, Connection> getConnections() {

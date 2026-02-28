@@ -19,7 +19,8 @@ class WorkerServiceTest {
     @Test
     @DisplayName("Processes enqueued packets and tracks connections")
     void processesPacketsAndTracksConnections() throws Exception {
-        WorkerService worker = new WorkerService(0, 100, new com.ayush.dpi.rules.RuleRegistry());
+        WorkerService worker = new WorkerService(0, 100, new com.ayush.dpi.rules.RuleRegistry(),
+                new com.ayush.dpi.stats.StatsService(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
         Thread thread = new Thread(worker);
         thread.start();
 
@@ -58,7 +59,8 @@ class WorkerServiceTest {
     @Test
     @DisplayName("Shuts down cleanly with empty queue")
     void shutsDownCleanlyWhenEmpty() throws Exception {
-        WorkerService worker = new WorkerService(1, 100, new com.ayush.dpi.rules.RuleRegistry());
+        WorkerService worker = new WorkerService(1, 100, new com.ayush.dpi.rules.RuleRegistry(),
+                new com.ayush.dpi.stats.StatsService(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
         Thread thread = new Thread(worker);
         thread.start();
 
@@ -73,7 +75,8 @@ class WorkerServiceTest {
     @Test
     @DisplayName("Returns false when queue is full")
     void returnsFalseWhenQueueFull() {
-        WorkerService worker = new WorkerService(2, 2, new com.ayush.dpi.rules.RuleRegistry());
+        WorkerService worker = new WorkerService(2, 2, new com.ayush.dpi.rules.RuleRegistry(),
+                new com.ayush.dpi.stats.StatsService(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
 
         boolean first = worker.enqueue(buildPacket("1.1.1.1", "2.2.2.2", 1, 2, ProtocolType.UDP, 1));
         boolean second = worker.enqueue(buildPacket("1.1.1.1", "2.2.2.2", 1, 2, ProtocolType.UDP, 2));
