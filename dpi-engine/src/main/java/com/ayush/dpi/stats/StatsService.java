@@ -11,11 +11,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
- * Central thread-safe statistics aggregator.
+ * Central thread-safe statistics aggregator for the DPI Engine.
  * <p>
- * Uses {@link LongAdder} and {@link ConcurrentHashMap} to accept highly
- * concurrent flush updates from worker threads with minimal contention.
- * Integrates directly with Spring Boot Actuator/Micrometer.
+ * Achieves lock-free global counter updates using {@link LongAdder} arrays and
+ * completely segregated {@link ConcurrentHashMap} entries. Accepts periodic
+ * batch flushes from isolated worker threads to dramatically reduce cache-line
+ * bouncing and thread contention on multicore architectures. It registers these
+ * accumulators directly to the Micrometer Prometheus registry.
  * </p>
  */
 @Slf4j
@@ -29,6 +31,7 @@ public class StatsService {
     private final LongAdder allowedPackets = new LongAdder();
     private final LongAdder blockedPackets = new LongAdder();
     private final LongAdder throttledPackets = new LongAdder();
+    private final LongAdder errorPackets = new LongAdder();
 
     private final ConcurrentHashMap<String, LongAdder> domainFrequency = new ConcurrentHashMap<>();
 
@@ -41,6 +44,7 @@ public class StatsService {
         registry.gauge("dpi.decisions", Tags.of("decision", "allow"), allowedPackets);
         registry.gauge("dpi.decisions", Tags.of("decision", "block"), blockedPackets);
         registry.gauge("dpi.decisions", Tags.of("decision", "throttle"), throttledPackets);
+        registry.gauge("dpi.errors", errorPackets);
     }
 
     /**
@@ -59,6 +63,7 @@ public class StatsService {
         allowedPackets.add(localStats.getAllowedPackets());
         blockedPackets.add(localStats.getBlockedPackets());
         throttledPackets.add(localStats.getThrottledPackets());
+        errorPackets.add(localStats.getErrorPackets());
 
         for (Map.Entry<String, Long> entry : localStats.getDomainFrequency().entrySet()) {
             domainFrequency.computeIfAbsent(entry.getKey(), k -> new LongAdder())
@@ -92,6 +97,10 @@ public class StatsService {
 
     public long getThrottledPackets() {
         return throttledPackets.sum();
+    }
+
+    public long getErrorPackets() {
+        return errorPackets.sum();
     }
 
     public Map<String, LongAdder> getDomainFrequency() {

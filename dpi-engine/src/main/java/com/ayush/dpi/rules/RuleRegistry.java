@@ -21,6 +21,13 @@ public class RuleRegistry {
 
     private final CopyOnWriteArrayList<Rule> rules = new CopyOnWriteArrayList<>();
 
+    public RuleRegistry(List<Rule> injectedRules) {
+        if (injectedRules != null) {
+            rules.addAll(injectedRules);
+            log.info("RuleRegistry initialized with {} rules", rules.size());
+        }
+    }
+
     /**
      * Add a rule to the registry.
      *

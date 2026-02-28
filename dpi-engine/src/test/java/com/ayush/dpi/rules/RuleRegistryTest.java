@@ -1,13 +1,9 @@
 package com.ayush.dpi.rules;
 
-import com.ayush.dpi.decision.Decision;
-import com.ayush.dpi.parser.ParsedPacket;
-import com.ayush.dpi.parser.ProtocolType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,7 +14,7 @@ class RuleRegistryTest {
 
     @BeforeEach
     void setUp() {
-        registry = new RuleRegistry();
+        registry = new RuleRegistry(java.util.Collections.emptyList());
     }
 
     @Test

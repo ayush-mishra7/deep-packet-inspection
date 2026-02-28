@@ -27,6 +27,7 @@ public class WorkerLocalStats {
     private long allowedPackets = 0;
     private long blockedPackets = 0;
     private long throttledPackets = 0;
+    private long errorPackets = 0;
 
     private final Map<String, Long> domainFrequency = new HashMap<>();
 
@@ -54,6 +55,13 @@ public class WorkerLocalStats {
     }
 
     /**
+     * Increment local counters for a packet that failed processing.
+     */
+    public void recordError() {
+        errorPackets++;
+    }
+
+    /**
      * Resets all local counters back to zero after flushing.
      */
     public void reset() {
@@ -64,6 +72,7 @@ public class WorkerLocalStats {
         allowedPackets = 0;
         blockedPackets = 0;
         throttledPackets = 0;
+        errorPackets = 0;
         domainFrequency.clear();
     }
 }

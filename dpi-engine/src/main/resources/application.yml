@@ -19,13 +19,29 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: when-authorized
   info:
     env:
       enabled: true
+
+# -----------------------------------------------------------------------------
+# Resilience4j
+# -----------------------------------------------------------------------------
+resilience4j.circuitbreaker:
+  instances:
+    threatIntelApi:
+      slidingWindowSize: 10
+      permittedNumberOfCallsInHalfOpenState: 3
+      failureRateThreshold: 50
+      waitDurationInOpenState: 10s
+resilience4j.retry:
+  instances:
+    threatIntelApi:
+      maxAttempts: 3
+      waitDuration: 500ms
 
 # -----------------------------------------------------------------------------
 # Application Info

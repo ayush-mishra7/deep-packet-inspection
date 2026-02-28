@@ -18,10 +18,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * A single worker thread that processes packets from its own blocking queue.
+ * A highly concurrent, isolated worker thread instance responsible for
+ * processing parsed packets.
  * <p>
- * Each worker maintains an isolated connection map and evaluates rules
- * from the shared {@link RuleRegistry} after updating connection stats.
+ * Each worker maintains a localized cache of connection states to ensure
+ * completely isolated
+ * memory access paths, avoiding cross-thread locks during hot packet
+ * processing. It periodically
+ * flushes its local statistics to the global
+ * {@link com.ayush.dpi.stats.StatsService},
+ * and evaluates rules from the shared {@link RuleRegistry}.
  * </p>
  */
 @Slf4j
@@ -34,6 +40,7 @@ public class WorkerService implements Runnable {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final RuleRegistry ruleRegistry;
     private final com.ayush.dpi.stats.StatsService statsService;
+    private final com.ayush.dpi.persistence.AuditEventPublisher auditEventPublisher;
     private final com.ayush.dpi.stats.WorkerLocalStats localStats = new com.ayush.dpi.stats.WorkerLocalStats();
 
     // Flush to global StatsService every N packets to minimize contention
@@ -50,11 +57,13 @@ public class WorkerService implements Runnable {
     private final AtomicLong totalProcessedCount = new AtomicLong(0);
 
     public WorkerService(int workerId, int queueCapacity, RuleRegistry ruleRegistry,
-            com.ayush.dpi.stats.StatsService statsService) {
+            com.ayush.dpi.stats.StatsService statsService,
+            com.ayush.dpi.persistence.AuditEventPublisher auditEventPublisher) {
         this.workerId = workerId;
         this.queue = new LinkedBlockingQueue<>(queueCapacity);
         this.ruleRegistry = ruleRegistry;
         this.statsService = statsService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     public boolean enqueue(ParsedPacket packet) {
@@ -75,10 +84,17 @@ public class WorkerService implements Runnable {
             try {
                 ParsedPacket packet = queue.take();
                 if (packet.getSequenceNumber() == -1) {
-                    log.debug("Worker-{} received shutdown signal", workerId);
+                    log.trace("Worker-{} received shutdown signal", workerId);
                     break;
                 }
-                processPacket(packet);
+
+                try {
+                    processPacket(packet);
+                } catch (Exception e) {
+                    log.error("Worker-{} | Error processing packet #{}: {}", workerId, packet.getSequenceNumber(),
+                            e.getMessage(), e);
+                    localStats.recordError();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("Worker-{} interrupted", workerId);
@@ -138,7 +154,10 @@ public class WorkerService implements Runnable {
         for (Rule rule : rules) {
             Decision decision = rule.evaluate(packet, connection);
             if (decision != Decision.ALLOW) {
-                log.debug("Worker-{} | Rule [{}] triggered: {}", workerId, rule.getName(), decision);
+                log.trace("Worker-{} | Rule [{}] triggered: {}", workerId, rule.getName(), decision);
+                if (auditEventPublisher != null) {
+                    auditEventPublisher.publishRuleMatch(packet, rule, decision);
+                }
                 return decision;
             }
         }

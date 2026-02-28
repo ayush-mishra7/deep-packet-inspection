@@ -9,6 +9,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+
+import com.ayush.dpi.rules.RuleRegistry;
+import com.ayush.dpi.stats.StatsService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LoadBalancerServiceTest {
 
     private DpiProperties properties;
+    private RuleRegistry registry;
+    private StatsService statsService;
     private LoadBalancerService loadBalancer;
 
     @BeforeEach
@@ -26,8 +34,9 @@ class LoadBalancerServiceTest {
         properties = new DpiProperties();
         properties.getWorker().setCount(2);
         properties.getWorker().setQueueCapacity(100);
-        loadBalancer = new LoadBalancerService(properties, new com.ayush.dpi.rules.RuleRegistry(),
-                new com.ayush.dpi.stats.StatsService(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
+        registry = new RuleRegistry(new ArrayList<>());
+        statsService = new StatsService(new SimpleMeterRegistry());
+        loadBalancer = new LoadBalancerService(properties, registry, statsService, null);
         loadBalancer.init();
     }
 

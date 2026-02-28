@@ -16,7 +16,10 @@ import org.springframework.context.ConfigurableApplicationContext;
  * real-time statistics.
  * </p>
  */
+import org.springframework.scheduling.annotation.EnableAsync;
+
 @Slf4j
+@EnableAsync
 @SpringBootApplication
 @ConfigurationPropertiesScan("com.ayush.dpi.config")
 public class DpiEngineApplication {

@@ -15,8 +15,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Distributes parsed packets across worker threads using consistent
- * five-tuple hashing.
+ * Distributes structured {@link ParsedPacket} flows across a pool of isolated
+ * worker threads.
+ * <p>
+ * This routing uses a consistent deterministic hash pattern (the five-tuple of
+ * protocol,
+ * source IP, dest IP, source port, dest port). By ensuring packets from a given
+ * connection
+ * always land on the identical worker thread, the engine eliminates the need
+ * for
+ * cross-thread connection state locking, ensuring massive scalable throughput.
+ * </p>
  */
 @Slf4j
 @Service
@@ -25,6 +34,7 @@ public class LoadBalancerService {
     private final DpiProperties properties;
     private final RuleRegistry ruleRegistry;
     private final com.ayush.dpi.stats.StatsService statsService;
+    private final com.ayush.dpi.persistence.AuditEventPublisher auditEventPublisher;
     private WorkerService[] workers;
     private ExecutorService executorService;
     private final AtomicBoolean initialized = new AtomicBoolean(false);
@@ -32,10 +42,12 @@ public class LoadBalancerService {
     private final AtomicLong dropCount = new AtomicLong(0);
 
     public LoadBalancerService(DpiProperties properties, RuleRegistry ruleRegistry,
-            com.ayush.dpi.stats.StatsService statsService) {
+            com.ayush.dpi.stats.StatsService statsService,
+            com.ayush.dpi.persistence.AuditEventPublisher auditEventPublisher) {
         this.properties = properties;
         this.ruleRegistry = ruleRegistry;
         this.statsService = statsService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     public void init() {
@@ -59,7 +71,7 @@ public class LoadBalancerService {
         });
 
         for (int i = 0; i < workerCount; i++) {
-            workers[i] = new WorkerService(i, queueCapacity, ruleRegistry, statsService);
+            workers[i] = new WorkerService(i, queueCapacity, ruleRegistry, statsService, auditEventPublisher);
             executorService.submit(workers[i]);
         }
 

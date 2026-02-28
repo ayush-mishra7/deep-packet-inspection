@@ -7,6 +7,12 @@ import com.ayush.dpi.parser.ParsedPacket;
 /**
  * A stateless, thread-safe rule that evaluates a packet in the context
  * of its connection and returns a traffic {@link Decision}.
+ * <p>
+ * This interface establishes the primary extension point for the DPI Engine.
+ * External plugin modules can implement this structural interface to inject
+ * custom threat-intelligence analysis, geo-blocking logic, or protocol
+ * tracking.
+ * </p>
  */
 public interface Rule {
 

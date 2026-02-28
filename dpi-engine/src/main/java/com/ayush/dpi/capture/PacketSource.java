@@ -1,11 +1,14 @@
 package com.ayush.dpi.capture;
 
 /**
- * Abstraction over a source of network packets.
+ * Abstraction over a source mechanism providing inbound network packets.
  * <p>
- * Implementations may read from PCAP files, live network interfaces, or any
- * other packet source. Each implementation streams packets to the provided
- * {@link PacketHandler} without loading the entire dataset into memory.
+ * Implementations may interpret raw PCAP files, tail active network interface
+ * cards in real-time mode, or bridge from an external messaging topic. Each
+ * implementation streams encapsulated payload instances to the provided
+ * callback
+ * without attempting to load the entirety of the packet context into heap
+ * memory.
  * </p>
  */
 public interface PacketSource {

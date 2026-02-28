@@ -35,7 +35,7 @@ public class PacketParserService {
      */
     public Optional<ParsedPacket> parse(RawPacket raw) {
         if (raw == null || raw.getData() == null || raw.getData().length == 0) {
-            log.debug("Skipping null or empty raw packet");
+            log.trace("Skipping null or empty raw packet");
             return Optional.empty();
         }
 
@@ -43,10 +43,10 @@ public class PacketParserService {
             EthernetPacket ethernet = EthernetPacket.newPacket(raw.getData(), 0, raw.getData().length);
             return parseEthernet(ethernet, raw);
         } catch (IllegalRawDataException e) {
-            log.debug("Packet #{} — malformed Ethernet frame: {}", raw.getSequenceNumber(), e.getMessage());
+            log.trace("Packet #{} — malformed Ethernet frame: {}", raw.getSequenceNumber(), e.getMessage());
             return Optional.empty();
         } catch (Exception e) {
-            log.debug("Packet #{} — unexpected parse error: {}", raw.getSequenceNumber(), e.getMessage());
+            log.trace("Packet #{} — unexpected parse error: {}", raw.getSequenceNumber(), e.getMessage());
             return Optional.empty();
         }
     }
@@ -57,7 +57,7 @@ public class PacketParserService {
         if (EtherType.IPV4.equals(etherType)) {
             IpV4Packet ipv4 = ethernet.get(IpV4Packet.class);
             if (ipv4 == null) {
-                log.debug("Packet #{} — EtherType IPv4 but no IPv4 payload", raw.getSequenceNumber());
+                log.trace("Packet #{} — EtherType IPv4 but no IPv4 payload", raw.getSequenceNumber());
                 return Optional.empty();
             }
             return parseIpV4(ipv4, raw);
@@ -66,13 +66,13 @@ public class PacketParserService {
         if (EtherType.IPV6.equals(etherType)) {
             IpV6Packet ipv6 = ethernet.get(IpV6Packet.class);
             if (ipv6 == null) {
-                log.debug("Packet #{} — EtherType IPv6 but no IPv6 payload", raw.getSequenceNumber());
+                log.trace("Packet #{} — EtherType IPv6 but no IPv6 payload", raw.getSequenceNumber());
                 return Optional.empty();
             }
             return parseIpV6(ipv6, raw);
         }
 
-        log.debug("Packet #{} — unsupported EtherType: {}", raw.getSequenceNumber(), etherType);
+        log.trace("Packet #{} — unsupported EtherType: {}", raw.getSequenceNumber(), etherType);
         return Optional.empty();
     }
 
