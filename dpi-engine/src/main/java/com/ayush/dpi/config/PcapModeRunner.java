@@ -2,6 +2,8 @@ package com.ayush.dpi.config;
 
 import com.ayush.dpi.capture.PacketIngestionService;
 import com.ayush.dpi.capture.PcapFilePacketSource;
+import com.ayush.dpi.parser.PacketParserService;
+import com.ayush.dpi.parser.ParsedPacket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -10,12 +12,16 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Executes PCAP file processing when the application starts in {@code pcap}
  * mode.
  * <p>
- * Reads all packets from the configured file, forwards them through the
- * ingestion pipeline, and then initiates a graceful shutdown.
+ * Reads all packets from the configured file, parses each one into a
+ * structured {@link ParsedPacket}, logs the results, and then initiates
+ * a graceful shutdown.
  * </p>
  */
 @Slf4j
@@ -25,6 +31,7 @@ public class PcapModeRunner implements ApplicationRunner {
 
     private final DpiProperties properties;
     private final PacketIngestionService ingestionService;
+    private final PacketParserService parserService;
     private final ApplicationContext applicationContext;
 
     @Override
@@ -43,15 +50,37 @@ public class PcapModeRunner implements ApplicationRunner {
 
         log.info("Running in PCAP mode — processing file: {}", pcapPath);
 
+        AtomicLong parsedCount = new AtomicLong(0);
+        AtomicLong skippedCount = new AtomicLong(0);
+
         try {
             PcapFilePacketSource source = new PcapFilePacketSource(pcapPath);
 
-            // Stub downstream handler — logs receipt at TRACE level.
-            // Will be replaced by the parser layer in Phase 3.
-            ingestionService.ingest(source, rawPacket -> log.trace("Received packet #{} ({} bytes)",
-                    rawPacket.getSequenceNumber(), rawPacket.getLength()));
+            ingestionService.ingest(source, rawPacket -> {
+                Optional<ParsedPacket> result = parserService.parse(rawPacket);
 
-            log.info("PCAP processing completed successfully");
+                if (result.isPresent()) {
+                    ParsedPacket pkt = result.get();
+                    parsedCount.incrementAndGet();
+
+                    log.info("Parsed #{}: {} {}:{} → {}:{} [{}B]{}",
+                            pkt.getSequenceNumber(),
+                            pkt.getProtocol(),
+                            pkt.getSrcIp(), pkt.getSrcPort(),
+                            pkt.getDestIp(), pkt.getDestPort(),
+                            pkt.getPacketSize(),
+                            pkt.getSni() != null ? " SNI=" + pkt.getSni() : "");
+                } else {
+                    skippedCount.incrementAndGet();
+                }
+            });
+
+            log.info("═══════════════════════════════════════");
+            log.info("  Parsing Summary");
+            log.info("  Parsed  : {}", parsedCount.get());
+            log.info("  Skipped : {}", skippedCount.get());
+            log.info("═══════════════════════════════════════");
+
         } catch (Exception e) {
             log.error("PCAP processing failed: {}", e.getMessage(), e);
         } finally {
