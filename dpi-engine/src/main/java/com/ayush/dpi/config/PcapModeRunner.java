@@ -2,8 +2,10 @@ package com.ayush.dpi.config;
 
 import com.ayush.dpi.capture.PacketIngestionService;
 import com.ayush.dpi.capture.PcapFilePacketSource;
+import com.ayush.dpi.loadbalancer.LoadBalancerService;
 import com.ayush.dpi.parser.PacketParserService;
 import com.ayush.dpi.parser.ParsedPacket;
+import com.ayush.dpi.worker.WorkerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -19,9 +21,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * Executes PCAP file processing when the application starts in {@code pcap}
  * mode.
  * <p>
- * Reads all packets from the configured file, parses each one into a
- * structured {@link ParsedPacket}, logs the results, and then initiates
- * a graceful shutdown.
+ * Pipeline: Capture → Parse → LoadBalancer → Workers (connection tracking).
+ * After ingestion completes, workers are shut down and per-worker connection
+ * summaries are logged.
  * </p>
  */
 @Slf4j
@@ -32,6 +34,7 @@ public class PcapModeRunner implements ApplicationRunner {
     private final DpiProperties properties;
     private final PacketIngestionService ingestionService;
     private final PacketParserService parserService;
+    private final LoadBalancerService loadBalancerService;
     private final ApplicationContext applicationContext;
 
     @Override
@@ -54,6 +57,9 @@ public class PcapModeRunner implements ApplicationRunner {
         AtomicLong skippedCount = new AtomicLong(0);
 
         try {
+            // Initialize the multi-threaded worker pool
+            loadBalancerService.init();
+
             PcapFilePacketSource source = new PcapFilePacketSource(pcapPath);
 
             ingestionService.ingest(source, rawPacket -> {
@@ -62,23 +68,24 @@ public class PcapModeRunner implements ApplicationRunner {
                 if (result.isPresent()) {
                     ParsedPacket pkt = result.get();
                     parsedCount.incrementAndGet();
-
-                    log.info("Parsed #{}: {} {}:{} → {}:{} [{}B]{}",
-                            pkt.getSequenceNumber(),
-                            pkt.getProtocol(),
-                            pkt.getSrcIp(), pkt.getSrcPort(),
-                            pkt.getDestIp(), pkt.getDestPort(),
-                            pkt.getPacketSize(),
-                            pkt.getSni() != null ? " SNI=" + pkt.getSni() : "");
+                    loadBalancerService.dispatch(pkt);
                 } else {
                     skippedCount.incrementAndGet();
                 }
             });
 
+            // Allow workers to drain their queues
+            Thread.sleep(500);
+
+            // Shutdown workers and print summary
+            loadBalancerService.shutdown();
+
             log.info("═══════════════════════════════════════");
-            log.info("  Parsing Summary");
-            log.info("  Parsed  : {}", parsedCount.get());
-            log.info("  Skipped : {}", skippedCount.get());
+            log.info("  Pipeline Summary");
+            log.info("  Parsed     : {}", parsedCount.get());
+            log.info("  Skipped    : {}", skippedCount.get());
+            log.info("  Dispatched : {}", loadBalancerService.getDispatchedCount());
+            log.info("  Dropped    : {}", loadBalancerService.getDropCount());
             log.info("═══════════════════════════════════════");
 
         } catch (Exception e) {

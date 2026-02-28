@@ -36,6 +36,9 @@ public class DpiProperties {
     /** Packet capture configuration. */
     private Capture capture = new Capture();
 
+    /** Worker thread pool configuration. */
+    private Worker worker = new Worker();
+
     @Getter
     @Setter
     public static class Capture {
@@ -50,5 +53,15 @@ public class DpiProperties {
 
         /** Log progress every N packets processed. */
         private int batchLogInterval = 1000;
+    }
+
+    @Getter
+    @Setter
+    public static class Worker {
+        /** Number of worker threads in the processing pool. */
+        private int count = 4;
+
+        /** Maximum capacity of each worker's packet queue. */
+        private int queueCapacity = 10000;
     }
 }

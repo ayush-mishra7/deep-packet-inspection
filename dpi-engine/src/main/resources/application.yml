@@ -50,3 +50,6 @@ dpi:
     snapshot-length: 65535
     pcap-file-path: # path to PCAP file (required when mode=pcap)
     batch-log-interval: 1000 # log progress every N packets
+  worker:
+    count: 4 # number of worker threads
+    queue-capacity: 10000 # max packets per worker queue
