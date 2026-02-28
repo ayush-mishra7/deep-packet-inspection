@@ -12,8 +12,10 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 /**
  * Broadcasts DPI pipeline statistics to all connected WebSocket clients.
@@ -25,6 +27,8 @@ public class StatsWebSocketHandler extends TextWebSocketHandler {
     private final StatsService statsService;
     private final ObjectMapper objectMapper;
     private final CopyOnWriteArrayList<WebSocketSession> sessions = new CopyOnWriteArrayList<>();
+    private long lastTotalPackets = 0;
+    private long lastBroadcastTime = System.currentTimeMillis();
 
     public StatsWebSocketHandler(StatsService statsService, ObjectMapper objectMapper) {
         this.statsService = statsService;
@@ -53,15 +57,39 @@ public class StatsWebSocketHandler extends TextWebSocketHandler {
         }
 
         try {
+            long currentTotalPackets = statsService.getTotalPackets();
+            long currentTime = System.currentTimeMillis();
+            long timeDiffMs = currentTime - lastBroadcastTime;
+
+            long throughputPerSecond = 0;
+            if (timeDiffMs > 0) {
+                throughputPerSecond = (long) ((currentTotalPackets - lastTotalPackets) * 1000.0 / timeDiffMs);
+            }
+
+            lastTotalPackets = currentTotalPackets;
+            lastBroadcastTime = currentTime;
+
+            long tcp = statsService.getTcpPackets();
+            long udp = statsService.getUdpPackets();
+            long totalProtocols = tcp + udp;
+            double tcpRatio = totalProtocols == 0 ? 0.0 : (double) tcp / totalProtocols;
+            double udpRatio = totalProtocols == 0 ? 0.0 : (double) udp / totalProtocols;
+
+            Map<String, Long> topDomains = statsService.getDomainFrequency().entrySet().stream()
+                    .sorted((e1, e2) -> Long.compare(e2.getValue().sum(), e1.getValue().sum()))
+                    .limit(10)
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().sum(), (e1, e2) -> e1,
+                            LinkedHashMap::new));
+
             Map<String, Object> stats = new HashMap<>();
-            stats.put("totalPackets", statsService.getTotalPackets());
-            stats.put("totalBytes", statsService.getTotalBytes());
-            stats.put("tcpPackets", statsService.getTcpPackets());
-            stats.put("udpPackets", statsService.getUdpPackets());
-            stats.put("allowedPackets", statsService.getAllowedPackets());
-            stats.put("blockedPackets", statsService.getBlockedPackets());
-            stats.put("throttledPackets", statsService.getThrottledPackets());
-            stats.put("errorPackets", statsService.getErrorPackets());
+            stats.put("totalPackets", currentTotalPackets);
+            stats.put("throughputPerSecond", throughputPerSecond);
+            stats.put("tcpRatio", tcpRatio);
+            stats.put("udpRatio", udpRatio);
+            stats.put("allowedCount", statsService.getAllowedPackets());
+            stats.put("blockedCount", statsService.getBlockedPackets());
+            stats.put("throttledCount", statsService.getThrottledPackets());
+            stats.put("topDomains", topDomains);
 
             String message = objectMapper.writeValueAsString(stats);
             TextMessage textMessage = new TextMessage(message);

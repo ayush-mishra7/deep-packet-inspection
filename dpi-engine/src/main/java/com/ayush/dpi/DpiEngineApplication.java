@@ -17,9 +17,11 @@ import org.springframework.context.ConfigurableApplicationContext;
  * </p>
  */
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Slf4j
 @EnableAsync
+@EnableScheduling
 @SpringBootApplication
 @ConfigurationPropertiesScan("com.ayush.dpi.config")
 public class DpiEngineApplication {

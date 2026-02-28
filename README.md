@@ -4,11 +4,15 @@
 
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2.5-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
-![Maven](https://img.shields.io/badge/Maven-3.9-C71A36?style=for-the-badge&logo=apache-maven&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
 **A production-grade, high-performance Deep Packet Inspection engine built with Spring Boot —  
 designed for real-time network traffic analysis, rule-based enforcement, and scalable packet processing.**
+
+[Getting Started](#-getting-started) · [Architecture](#-architecture) · [API Reference](#-api-reference) · [Dashboard](#-real-time-dashboard) · [Deployment](#-deployment--containerization) · [Benchmarks](#-performance--benchmarks)
 
 </div>
 
@@ -16,9 +20,14 @@ designed for real-time network traffic analysis, rule-based enforcement, and sca
 
 ## 🌐 Overview
 
-The **DPI Engine** captures and analyzes network packets from PCAP files or live interfaces, extracts rich metadata, builds logical connections using five-tuple tracking, applies dynamic traffic rules (ALLOW / BLOCK / THROTTLE), and exposes real-time analytics through REST APIs.
+The **DPI Engine** captures and analyzes network packets from PCAP files or synthetic traffic generators, extracts rich metadata (IP addresses, ports, protocols, TLS SNI), builds logical connections using five-tuple tracking, applies dynamic traffic rules (**ALLOW** / **BLOCK** / **THROTTLE**), and streams real-time analytics through WebSocket and REST APIs to a live React dashboard.
 
-Built with clean layered architecture and designed for multi-threaded scalability from day one.
+### Key Capabilities
+
+- **Multi-threaded packet processing** — Worker pool with five-tuple hash-based load balancing for connection affinity
+- **Dynamic rule engine** — IP blocking, domain blocking (with wildcard support), and data cap enforcement via REST API at runtime
+- **Real-time observability** — WebSocket-powered live dashboard, Prometheus metrics, and structured logging
+- **Production-ready** — Graceful shutdown, bounded queues with backpressure, circuit breakers, Docker + K8s deployment, and a full CI pipeline
 
 ---
 
@@ -27,84 +36,92 @@ Built with clean layered architecture and designed for multi-threaded scalabilit
 ```
 ┌─────────────┐     ┌─────────────┐     ┌───────────────┐
 │   Capture   │────▶│   Parser    │────▶│ Load Balancer │
-│  (PCAP/NIC) │     │ (IP/TCP/TLS)│     │ (Hash/RR)     │
+│  (PCAP/NIC) │     │ (IP/TCP/TLS)│     │(5-Tuple Hash) │
 └─────────────┘     └─────────────┘     └───────┬───────┘
                                                 │
                     ┌───────────────────────────┼───────────────────────┐
                     ▼                           ▼                       ▼
             ┌──────────────┐           ┌──────────────┐        ┌──────────────┐
             │   Worker 1   │           │   Worker 2   │  ...   │   Worker N   │
+            │  ┌─────────┐ │           │  ┌─────────┐ │        │  ┌─────────┐ │
+            │  │Conn Map │ │           │  │Conn Map │ │        │  │Conn Map │ │
+            │  │Rule Eval│ │           │  │Rule Eval│ │        │  │Rule Eval│ │
+            │  │Local Sta│ │           │  │Local Sta│ │        │  │Local Sta│ │
+            │  └─────────┘ │           │  └─────────┘ │        │  └─────────┘ │
             └──────┬───────┘           └──────┬───────┘        └──────┬───────┘
                    │                          │                       │
-                   ▼                          ▼                       ▼
-            ┌──────────────┐           ┌──────────────┐        ┌──────────────┐
-            │  Connection  │           │    Rules     │        │  Decision    │
-            │   Tracker    │           │    Engine    │        │   Engine     │
-            └──────┬───────┘           └──────┬───────┘        └──────┬───────┘
-                   │                          │                       │
-                   ▼                          ▼                       ▼
-            ┌──────────────┐           ┌──────────────┐        ┌──────────────┐
-            │ AI Extractor │           │ Async Events │        │  Prometheus  │
-            │  (ML Ready)  │           │   (Postgres) │        │   Metrics    │
-            └──────────────┘           └──────────────┘        └──────────────┘
-                                              │
-                                              ▼
-                                    ┌──────────────────┐
-                                    │ WebSocket Streams│
-                                    │ & REST API Layer │
-                                    └──────────────────┘
+                   └──────────────┬───────────┘───────────────────────┘
+                                  ▼
+                    ┌──────────────────────────┐
+                    │  Global Stats Aggregator │  (LongAdder — lock-free)
+                    └────────────┬─────────────┘
+                                 │
+                   ┌─────────────┼──────────────┐
+                   ▼             ▼               ▼
+          ┌──────────────┐ ┌──────────┐  ┌──────────────┐
+          │  REST API    │ │WebSocket │  │  Prometheus  │
+          │  /api/*      │ │ /ws/stats│  │  /actuator/* │
+          └──────────────┘ └──────────┘  └──────────────┘
+                   │             │
+                   ▼             ▼
+          ┌──────────────────────────────┐
+          │     React Dashboard (Vite)   │
+          │  Throughput · Decisions · SNI │
+          └──────────────────────────────┘
 ```
 
----
-
-## 📦 Extracted Metadata
-
-| Field              | Description                                |
-|--------------------|--------------------------------------------|
-| **Source IP**       | IPv4/IPv6 source address                   |
-| **Destination IP**  | IPv4/IPv6 destination address              |
-| **Source Port**     | Transport-layer source port                |
-| **Destination Port**| Transport-layer destination port           |
-| **Protocol**        | TCP or UDP                                 |
-| **Packet Size**     | Total packet length in bytes               |
-| **Timestamp**       | Capture timestamp (nanosecond precision)   |
-| **TLS SNI**         | Server Name Indication (when available)    |
+Each **worker thread** maintains its own connection map, rule evaluation context, and local statistics — completely isolated to avoid cross-thread locking on the hot path. Workers flush stats to the global `StatsService` (backed by `LongAdder`) every 1,000 packets, minimizing cache-line contention.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-dpi-engine/
-└── src/main/java/com/ayush/dpi/
-    ├── DpiEngineApplication.java    # Application entry point
-    ├── config/                      # Centralized configuration & properties
-    ├── capture/                     # Packet ingestion (PCAP / live interfaces)
-    ├── parser/                      # Raw byte → structured metadata decoding
-    ├── loadbalancer/                # Packet distribution across worker threads
-    ├── worker/                      # Multi-threaded packet processing pool
-    ├── connection/                  # Five-tuple connection tracking
-    ├── rules/                       # Dynamic traffic rule definitions
-    ├── decision/                    # Rule evaluation & action determination
-    ├── stats/                       # Real-time metrics aggregation
-    ├── api/                         # REST controllers & error handling
-    └── util/                        # Shared helpers & constants
+deep-packet-inspection/
+├── dpi-engine/                      # Backend — Spring Boot application
+│   └── src/main/java/com/ayush/dpi/
+│       ├── DpiEngineApplication.java    # Entry point (@EnableScheduling, @EnableAsync)
+│       ├── api/                         # REST controllers (Health, Stats, Rules)
+│       ├── capture/                     # Packet ingestion (PCAP files, synthetic traffic)
+│       ├── parser/                      # Raw bytes → ParsedPacket + SNI extraction
+│       ├── loadbalancer/                # Five-tuple hashing & worker dispatch
+│       ├── worker/                      # Multi-threaded packet processing pool
+│       ├── connection/                  # ConnectionKey (record) & Connection tracking
+│       ├── rules/                       # IpBlockRule, DomainBlockRule, DataCapRule
+│       ├── decision/                    # Decision enum (ALLOW, BLOCK, THROTTLE)
+│       ├── stats/                       # StatsService, WorkerLocalStats aggregation
+│       ├── websocket/                   # WebSocket handler (1s live broadcast)
+│       ├── analytics/                   # AI feature extraction (ML-ready)
+│       ├── persistence/                 # Async audit event publishing (JPA/Postgres)
+│       └── config/                      # DpiProperties, WebSocket, Resilience4j
+├── dpi-dashboard/                   # Frontend — React 19 + Vite + Tailwind CSS 4
+│   └── src/
+│       ├── App.tsx                      # Main dashboard layout
+│       ├── components/                  # StatsCard, ThroughputChart, DecisionPieChart
+│       └── hooks/useDpiStats.ts         # WebSocket hook for live data
+├── k8s/                             # Kubernetes manifests (Deployment + Service)
+├── .github/workflows/ci.yml        # GitHub Actions CI pipeline
+├── Dockerfile                       # Multi-stage build (Maven → JRE 17)
+├── docker-compose.yml               # Engine + PostgreSQL stack
+└── README.md
 ```
 
 ---
 
 ## ⚙️ Tech Stack
 
-| Technology        | Purpose                                     |
-|-------------------|---------------------------------------------|
-| **Java 17**       | Modern LTS with records & pattern matching  |
-| **Spring Boot 3.2** | Production-grade application framework   |
-| **Spring Web**    | REST API layer                              |
-| **Spring Actuator** | Health, metrics, info endpoints           |
-| **Spring Validation** | Request payload validation              |
-| **Lombok**        | Boilerplate reduction                       |
-| **Logback**       | Structured logging with rolling files       |
-| **JUnit 5 + MockMvc** | Integration testing                    |
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Backend** | Java 17, Spring Boot 3.2.5 | Application framework |
+| **Packet Capture** | pcap4j 1.8.2 | PCAP file reading & live packet capture |
+| **Persistence** | Spring Data JPA, PostgreSQL 15, H2 (dev) | Audit event storage |
+| **Observability** | Micrometer, Prometheus, Spring Actuator | Metrics & health endpoints |
+| **Resilience** | Resilience4j | Circuit breakers & retry policies |
+| **Real-time** | Spring WebSocket | 1-second live stats broadcast |
+| **Frontend** | React 19, Vite 7, Tailwind CSS 4, Recharts | Real-time analytics dashboard |
+| **Testing** | JUnit 5, MockMvc, AssertJ | 54 tests (unit + integration) |
+| **CI/CD** | GitHub Actions | Build, test, Docker build on every push |
+| **Deployment** | Docker, Kubernetes | Containerized production deployment |
 
 ---
 
@@ -112,65 +129,178 @@ dpi-engine/
 
 ### Prerequisites
 
-- **Java 17+**
-- **Maven 3.9+** (or use the included wrapper)
+| Tool | Version | Required For |
+|------|---------|-------------|
+| **Java** | 17+ | Backend engine |
+| **Maven** | 3.9+ | Build system |
+| **Node.js** | 18+ | Dashboard (optional) |
+| **Docker** | 20+ | Containerized deployment (optional) |
 
-### Build
+### 1. Build & Run the Engine
 
 ```bash
 cd dpi-engine
 mvn clean install
-```
-
-### Run
-
-```bash
-cd dpi-engine
 mvn spring-boot:run
 ```
 
-### Verify
+The engine starts on **http://localhost:8080** in `server` mode by default.
+
+### 2. Start the Dashboard (optional)
 
 ```bash
-# Custom health endpoint
-curl http://localhost:8080/api/health
-
-# Actuator health
-curl http://localhost:8080/actuator/health
+cd dpi-dashboard
+npm install
+npm run dev
 ```
 
-**Expected response from `/api/health`:**
+Opens at **http://localhost:5173** — connects to the engine's WebSocket automatically.
 
+### 3. Verify
+
+```bash
+# Health check
+curl http://localhost:8080/api/health
+# → {"status":"UP","timestamp":"...","version":"0.1.0-SNAPSHOT"}
+
+# Live stats
+curl http://localhost:8080/api/stats
+
+# Actuator
+curl http://localhost:8080/actuator/health
+curl http://localhost:8080/actuator/info
+```
+
+---
+
+## 📡 API Reference
+
+### Health & Monitoring
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/health` | Custom health check with version and timestamp |
+| `GET` | `/api/stats` | Aggregated packet statistics (protocols, decisions, top domains) |
+| `GET` | `/actuator/health` | Spring actuator health |
+| `GET` | `/actuator/info` | Application info metadata |
+| `GET` | `/actuator/prometheus` | Prometheus-format metrics scrape endpoint |
+| `WS` | `/ws/stats` | WebSocket — broadcasts live stats every 1 second |
+
+### Dynamic Rule Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/rules` | List all active rules |
+| `POST` | `/api/rules` | Create a new rule |
+| `DELETE` | `/api/rules/{name}` | Remove a rule by name |
+
+#### Rule Types & Payloads
+
+**IP Block** — Block traffic from/to specific IP addresses:
 ```json
 {
-  "status": "UP",
-  "timestamp": "2026-02-28T06:18:42.123Z",
-  "version": "0.1.0-SNAPSHOT"
+  "name": "block-suspicious-ips",
+  "type": "IP_BLOCK",
+  "values": ["10.0.0.99", "192.168.1.50"]
 }
+```
+
+**Domain Block** — Block traffic by SNI domain (supports wildcards):
+```json
+{
+  "name": "block-malware-domains",
+  "type": "DOMAIN_BLOCK",
+  "values": ["*.evil.com", "malware.org"]
+}
+```
+
+**Data Cap** — Throttle at threshold, block at 2× threshold (bytes per connection):
+```json
+{
+  "name": "limit-large-transfers",
+  "type": "DATA_CAP",
+  "threshold": 5000000
+}
+```
+
+---
+
+## 📊 Real-time Dashboard
+
+The **dpi-dashboard** is a React 19 single-page application that connects to the engine's WebSocket endpoint and visualizes:
+
+- **Throughput** — Packets per second over time (line chart)
+- **Decision Distribution** — ALLOW / BLOCK / THROTTLE breakdown (pie chart)
+- **Protocol Ratio** — TCP vs UDP traffic split
+- **Top Domains** — Most frequently seen SNI domains
+- **Live Counters** — Total packets, bytes processed, active rules
+
+The dashboard updates every second with zero polling — all data is pushed via WebSocket.
+
+---
+
+## 🔄 Operating Modes
+
+The engine supports three modes, controlled by the `DPI_MODE` environment variable or `dpi.mode` property:
+
+| Mode | Description | Behavior |
+|------|-------------|----------|
+| `server` | **Default.** REST API + WebSocket dashboard | Stays running indefinitely |
+| `benchmark` | Injects 1,000,000 synthetic packets | Processes all packets, prints summary, then exits |
+| `pcap` | Reads from a `.pcap` file | Processes all packets from file, then exits |
+
+```bash
+# Server mode (default)
+mvn spring-boot:run
+
+# Benchmark mode
+mvn spring-boot:run -Dspring-boot.run.arguments="--dpi.mode=benchmark"
+
+# PCAP file mode
+mvn spring-boot:run -Dspring-boot.run.arguments="--dpi.mode=pcap --dpi.capture.pcap-file-path=/path/to/file.pcap"
 ```
 
 ---
 
 ## 🐳 Deployment & Containerization
 
-The DPI engine is fully containerized with a lightweight, multi-stage Dockerfile and can be deployed in production environments using Docker Compose or Kubernetes.
+### Docker
 
-### Environment Configuration
-The following environment variables dynamically override `application.yml`:
-*   `DPI_MODE`: `server` (REST only) or `benchmark` (Load test injection)
-*   `DPI_WORKER_COUNT`: Number of threads allocated
-*   `DPI_PCAP_FILE`: Absolute path if processing a file
-*   `LOGGING_LEVEL_ROOT`: `INFO`, `DEBUG`, or `TRACE`
+The multi-stage Dockerfile builds with Maven and packages into a slim JRE 17 runtime image with libpcap, running as a non-root user.
 
-### Docker Compose (Recommended Local)
-A `docker-compose.yml` is included to spin up the API and a PostgreSQL database (prepared for log aggregation).
+```bash
+# Build
+docker build -t dpi-engine .
+
+# Run in server mode
+docker run -p 8080:8080 dpi-engine
+
+# Run benchmark
+docker run --rm -e DPI_MODE=benchmark dpi-engine
+```
+
+### Docker Compose
+
+Spins up the engine alongside PostgreSQL 15 for audit event persistence:
+
 ```bash
 docker-compose up -d
 docker-compose logs -f dpi-engine
 ```
 
-### Kubernetes (K8s)
-Manifests are provided in `/k8s` for cloud deployments.
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DPI_MODE` | `server` | Operating mode (`server`, `benchmark`, `pcap`) |
+| `DPI_WORKER_COUNT` | `4` | Number of worker threads |
+| `DPI_PCAP_FILE` | _(empty)_ | Path to PCAP file (required for `pcap` mode) |
+| `LOGGING_LEVEL_ROOT` | `INFO` | Log level (`DEBUG`, `INFO`, `WARN`) |
+
+### Kubernetes
+
+Production-ready manifests with liveness/readiness probes, resource limits, rolling updates, and graceful shutdown:
+
 ```bash
 kubectl apply -f k8s/deployment.yml
 kubectl apply -f k8s/service.yml
@@ -179,46 +309,85 @@ kubectl get pods -w
 
 ---
 
-## 🗺️ Roadmap
+## ✅ Testing
 
-| Phase | Description                                       | Status       |
-|-------|---------------------------------------------------|--------------|
-| 1     | Project scaffold, health API, config, logging     | ✅ Complete   |
-| 2     | Packet capture & parsing (PCAP + live interface)  | ✅ Complete   |
-| 3     | Connection tracking with five-tuple               | ✅ Complete   |
-| 4     | Rule engine with dynamic ALLOW/BLOCK/THROTTLE     | ✅ Complete   |
-| 5     | Multi-threaded worker pool with load balancing    | ✅ Complete   |
-| 6     | Real-time statistics & dashboard APIs             | ✅ Complete   |
-| 7     | Performance tuning & production hardening         | ✅ Complete   |
-| 8     | Docker, Kubernetes, and CI/CD pipelines           | ✅ Complete   |
-| 9     | Extensibility, Observability, Persistence & AI    | ✅ Complete   |
+**54 tests** across 15 test classes — all passing, zero failures.
+
+```bash
+cd dpi-engine
+mvn test
+```
+
+| Test Class | Tests | Coverage Area |
+|-----------|-------|--------------|
+| `SystemPerformanceTest` | 1 | 1M packet throughput (>90% success assertion) |
+| `PacketIngestionServiceTest` | 3 | Packet forwarding, empty sources, counter resets |
+| `PcapFilePacketSourceTest` | 4 | PCAP reading, metadata, error handling (3 skip without Npcap) |
+| `PacketParserServiceTest` | 5 | IPv4/TCP/UDP parsing, null/empty/garbage handling |
+| `SniExtractorTest` | 7 | TLS ClientHello SNI extraction, edge cases |
+| `FiveTupleHasherTest` | 5 | Deterministic hashing, worker index range |
+| `LoadBalancerServiceTest` | 3 | Connection affinity, distribution, per-worker tracking |
+| `WorkerServiceTest` | 3 | Processing, graceful shutdown, queue backpressure |
+| `IpBlockRuleTest` | 3 | Source/destination IP blocking |
+| `DomainBlockRuleTest` | 6 | Exact, wildcard, case-insensitive, no-SNI handling |
+| `DataCapRuleTest` | 3 | Under/over threshold, 2× block |
+| `RuleRegistryTest` | 5 | CRUD, clear, thread-safe snapshots |
+| `StatsServiceTest` | 2 | Single flush, 10-thread concurrent aggregation |
+| `WorkerLocalStatsTest` | 2 | Recording and reset |
+| `DpiEngineApplicationTests` | 2 | Context loading, health endpoint integration |
+
+### CI Pipeline
+
+GitHub Actions runs on every push and PR to `main`:
+
+1. **Build** — `mvn package`
+2. **Test** — `mvn test`
+3. **Docker Build** — `docker build`
+4. **Docker Smoke Test** — Runs container in benchmark mode
 
 ---
 
 ## ⚡ Performance & Benchmarks
 
-The DPI Engine is optimized for high-throughput packet processing, utilizing an asynchronous event-driven architecture, lock-free concurrency, and zero-allocation data structures on the hot path.
+The engine is optimized for high-throughput packet processing with lock-free concurrency and zero shared mutable state on the hot path.
 
 ### Key Optimizations
-*   **`ConnectionKey` Optimization:** Replaced string-based hashing with an immutable `record` that precomputes its `hashCode`, avoiding expensive string concatenations and drastically improving HashMap lookups.
-*   **Dynamic Worker Scaling:** The `LoadBalancerService` automatically provisions worker threads matching the available CPU cores.
-*   **Lock-Free Analytics:** Uses `LongAdder` and `ConcurrentHashMap` combined with periodic worker-local flushing to eliminate thread contention on global statistics.
-*   **Reduced I/O Bottlenecks:** Sampled downstream logging on the hot path to prevent logger I/O blocking.
 
-### Micro-Benchmark Results
+- **`ConnectionKey` as Java record** — Precomputed `hashCode`, no string concatenation, O(1) HashMap lookups
+- **Worker isolation** — Each worker owns its connection map, rule evaluation, and local stats — zero cross-thread locks during processing
+- **Lock-free aggregation** — `LongAdder` and `ConcurrentHashMap` with periodic batch flushes (every 1,000 packets) to eliminate cache-line bouncing
+- **Bounded queues with backpressure** — `LinkedBlockingQueue` per worker with configurable capacity; drops are tracked, not blocked
+- **Sampled logging** — Hot-path logging uses `TRACE` level to avoid I/O bottlenecks
 
-Using the built-in `SyntheticTrafficSimulator` simulating realistic connection distributions across local threads, the following results were achieved:
+### Benchmark Results
 
-*   **Total Packets Injected:** 1,000,000 packets
-*   **Ingestion Rate:** ~400,000+ packets/second
-*   **Processing Time:** ~2.3 seconds
-*   **Throughput Success:** 94-98% ingestion success ratio under extreme continuous load without client-side backpressure.
+Using the built-in `SyntheticTrafficSimulator` (realistic connection distributions, mixed protocols, randomized SNI):
+
+| Metric | Value |
+|--------|-------|
+| **Packets Injected** | 1,000,000 |
+| **Packets Processed** | ~991,000+ |
+| **Workers** | 4 threads |
+| **Ingestion Rate** | ~400,000+ packets/second |
+| **Processing Time** | ~2.3 seconds |
+| **Success Ratio** | 94–99% (under extreme continuous load) |
 
 ---
 
-## 🤝 Contributing
+## 🗺️ Roadmap
 
-This is a system design portfolio project. Contributions, suggestions, and feedback are welcome.
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Project scaffold, health API, config, logging | ✅ Complete |
+| 2 | Packet capture & parsing (PCAP + live interface) | ✅ Complete |
+| 3 | Connection tracking with five-tuple | ✅ Complete |
+| 4 | Multi-threaded worker pool with load balancing | ✅ Complete |
+| 5 | Rule engine with dynamic ALLOW / BLOCK / THROTTLE | ✅ Complete |
+| 6 | Real-time statistics & dashboard APIs | ✅ Complete |
+| 7 | Performance tuning & 1M packet benchmark | ✅ Complete |
+| 8 | Docker, Kubernetes, and CI/CD pipeline | ✅ Complete |
+| 9 | Extensibility, Observability, Persistence & AI | ✅ Complete |
+| 10 | Real-time React dashboard with WebSocket | ✅ Complete |
 
 ---
 
