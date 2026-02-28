@@ -1,0 +1,49 @@
+# =============================================================================
+# DPI Engine — Application Configuration
+# =============================================================================
+
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: dpi-engine
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+# -----------------------------------------------------------------------------
+# Actuator
+# -----------------------------------------------------------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+# -----------------------------------------------------------------------------
+# Application Info
+# -----------------------------------------------------------------------------
+info:
+  app:
+    name: DPI Engine
+    description: High-performance Deep Packet Inspection engine
+    version: 0.1.0-SNAPSHOT
+
+# -----------------------------------------------------------------------------
+# DPI Custom Properties
+# -----------------------------------------------------------------------------
+dpi:
+  app-name: DPI Engine
+  version: 0.1.0-SNAPSHOT
+  max-workers: 4
+  default-action: ALLOW
+  capture:
+    buffer-size: 65536
+    snapshot-length: 65535
