@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  dpi-engine:
+    build: .
+    image: dpi-engine:latest
+    container_name: dpi-engine
+    ports:
+      - "8080:8080"
+    environment:
+      - DPI_MODE=server
+      - DPI_WORKER_COUNT=4
+      - LOGGING_LEVEL_ROOT=INFO
+      # - DPI_PCAP_FILE=/data/sample.pcap
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/dpi
+      - SPRING_DATASOURCE_USERNAME=dpiuser
+      - SPRING_DATASOURCE_PASSWORD=dpipassword
+    # volumes:
+    #   - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dpi-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: dpi-postgres
+    environment:
+      - POSTGRES_DB=dpi
+      - POSTGRES_USER=dpiuser
+      - POSTGRES_PASSWORD=dpipassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dpiuser -d dpi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dpi-network
+
+volumes:
+  postgres_data:
+
+networks:
+  dpi-network:
+    driver: bridge

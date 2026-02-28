@@ -42,14 +42,14 @@ info:
 dpi:
   app-name: DPI Engine
   version: 0.1.0-SNAPSHOT
-  mode: server # "pcap" = process file & exit, "server" = REST API only
+  mode: ${DPI_MODE:server} # "pcap" = process file & exit, "server" = REST API only, "benchmark" = load test
   max-workers: 4
   default-action: ALLOW
   capture:
     buffer-size: 65536
     snapshot-length: 65535
-    pcap-file-path: # path to PCAP file (required when mode=pcap)
+    pcap-file-path: ${DPI_PCAP_FILE:} # path to PCAP file (required when mode=pcap)
     batch-log-interval: 1000 # log progress every N packets
   worker:
-    count: 4 # number of worker threads
+    count: ${DPI_WORKER_COUNT:4} # number of worker threads
     queue-capacity: 10000 # max packets per worker queue

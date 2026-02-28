@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dpi-engine
+  labels:
+    app: dpi-engine
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dpi-engine
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: dpi-engine
+    spec:
+      containers:
+        - name: dpi-engine
+          image: dpi-engine:latest # Replace with your registry e.g., ghcr.io/username/dpi-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DPI_MODE
+              value: "server"
+            - name: DPI_WORKER_COUNT
+              value: "2"
+            - name: LOGGING_LEVEL_ROOT
+              value: "INFO"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 10"] # Allow in-flight requests to complete

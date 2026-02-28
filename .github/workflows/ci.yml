@@ -1,0 +1,38 @@
+name: DPI Engine CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B package --file dpi-engine/pom.xml
+
+      - name: Run Tests
+        # We already package (which includes test), but keeping this explicit just in case
+        run: mvn test -B --file dpi-engine/pom.xml
+
+      - name: Build Docker image
+        run: docker build -t dpi-engine:ci-test .
+
+      - name: Test Docker image (Benchmark mode)
+        run: |
+          docker run --rm \
+            -e DPI_MODE=benchmark \
+            -e DPI_WORKER_COUNT=2 \
+            dpi-engine:ci-test

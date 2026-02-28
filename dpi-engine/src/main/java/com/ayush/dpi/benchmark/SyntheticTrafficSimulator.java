@@ -42,6 +42,10 @@ public class SyntheticTrafficSimulator {
     public void runBenchmark(int totalPackets, int batchSize) throws InterruptedException {
         log.info("Starting Benchmark: injecting {} packets...", totalPackets);
 
+        if (!loadBalancer.isInitialized()) {
+            loadBalancer.init();
+        }
+
         long startTimeNs = System.nanoTime();
 
         for (int i = 0; i < totalPackets; i++) {

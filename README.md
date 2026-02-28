@@ -145,6 +145,34 @@ curl http://localhost:8080/actuator/health
 
 ---
 
+## 🐳 Deployment & Containerization
+
+The DPI engine is fully containerized with a lightweight, multi-stage Dockerfile and can be deployed in production environments using Docker Compose or Kubernetes.
+
+### Environment Configuration
+The following environment variables dynamically override `application.yml`:
+*   `DPI_MODE`: `server` (REST only) or `benchmark` (Load test injection)
+*   `DPI_WORKER_COUNT`: Number of threads allocated
+*   `DPI_PCAP_FILE`: Absolute path if processing a file
+*   `LOGGING_LEVEL_ROOT`: `INFO`, `DEBUG`, or `TRACE`
+
+### Docker Compose (Recommended Local)
+A `docker-compose.yml` is included to spin up the API and a PostgreSQL database (prepared for log aggregation).
+```bash
+docker-compose up -d
+docker-compose logs -f dpi-engine
+```
+
+### Kubernetes (K8s)
+Manifests are provided in `/k8s` for cloud deployments.
+```bash
+kubectl apply -f k8s/deployment.yml
+kubectl apply -f k8s/service.yml
+kubectl get pods -w
+```
+
+---
+
 ## 🗺️ Roadmap
 
 | Phase | Description                                       | Status       |
