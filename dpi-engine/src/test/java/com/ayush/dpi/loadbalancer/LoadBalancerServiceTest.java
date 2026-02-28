@@ -26,7 +26,7 @@ class LoadBalancerServiceTest {
         properties = new DpiProperties();
         properties.getWorker().setCount(2);
         properties.getWorker().setQueueCapacity(100);
-        loadBalancer = new LoadBalancerService(properties);
+        loadBalancer = new LoadBalancerService(properties, new com.ayush.dpi.rules.RuleRegistry());
         loadBalancer.init();
     }
 

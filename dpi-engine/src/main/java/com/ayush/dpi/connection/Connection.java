@@ -1,5 +1,6 @@
 package com.ayush.dpi.connection;
 
+import com.ayush.dpi.decision.Decision;
 import com.ayush.dpi.parser.ParsedPacket;
 import com.ayush.dpi.parser.ProtocolType;
 import lombok.Getter;
@@ -29,6 +30,7 @@ public class Connection {
     private long packetCount;
     private Instant firstSeen;
     private Instant lastSeen;
+    private Decision lastDecision = Decision.ALLOW;
 
     public Connection(String fiveTupleKey, ParsedPacket initialPacket) {
         this.fiveTupleKey = fiveTupleKey;
@@ -54,5 +56,14 @@ public class Connection {
         if (packet.getTimestamp() != null) {
             this.lastSeen = packet.getTimestamp();
         }
+    }
+
+    /**
+     * Set the last rule evaluation decision for this connection.
+     *
+     * @param decision the decision from rule evaluation
+     */
+    public void setLastDecision(Decision decision) {
+        this.lastDecision = decision;
     }
 }

@@ -2,6 +2,7 @@ package com.ayush.dpi.loadbalancer;
 
 import com.ayush.dpi.config.DpiProperties;
 import com.ayush.dpi.parser.ParsedPacket;
+import com.ayush.dpi.rules.RuleRegistry;
 import com.ayush.dpi.worker.WorkerService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -16,31 +17,24 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Distributes parsed packets across worker threads using consistent
  * five-tuple hashing.
- * <p>
- * All packets belonging to the same logical connection (same five-tuple)
- * are guaranteed to be routed to the same worker, eliminating the need
- * for cross-thread synchronization on connection state.
- * </p>
  */
 @Slf4j
 @Service
 public class LoadBalancerService {
 
     private final DpiProperties properties;
+    private final RuleRegistry ruleRegistry;
     private WorkerService[] workers;
     private ExecutorService executorService;
     private final AtomicBoolean initialized = new AtomicBoolean(false);
     private final AtomicLong dispatchedCount = new AtomicLong(0);
     private final AtomicLong dropCount = new AtomicLong(0);
 
-    public LoadBalancerService(DpiProperties properties) {
+    public LoadBalancerService(DpiProperties properties, RuleRegistry ruleRegistry) {
         this.properties = properties;
+        this.ruleRegistry = ruleRegistry;
     }
 
-    /**
-     * Initialize workers and start the thread pool.
-     * Safe to call multiple times — only first call takes effect.
-     */
     public void init() {
         if (!initialized.compareAndSet(false, true)) {
             log.warn("LoadBalancer already initialized, skipping");
@@ -50,7 +44,8 @@ public class LoadBalancerService {
         int workerCount = properties.getWorker().getCount();
         int queueCapacity = properties.getWorker().getQueueCapacity();
 
-        log.info("Initializing LoadBalancer: {} workers, queue capacity {}", workerCount, queueCapacity);
+        log.info("Initializing LoadBalancer: {} workers, queue capacity {}, {} active rules",
+                workerCount, queueCapacity, ruleRegistry.size());
 
         workers = new WorkerService[workerCount];
         executorService = Executors.newFixedThreadPool(workerCount, r -> {
@@ -61,18 +56,13 @@ public class LoadBalancerService {
         });
 
         for (int i = 0; i < workerCount; i++) {
-            workers[i] = new WorkerService(i, queueCapacity);
+            workers[i] = new WorkerService(i, queueCapacity, ruleRegistry);
             executorService.submit(workers[i]);
         }
 
         log.info("LoadBalancer initialized — {} workers running", workerCount);
     }
 
-    /**
-     * Dispatch a parsed packet to the appropriate worker based on five-tuple hash.
-     *
-     * @param packet the parsed packet to route
-     */
     public void dispatch(ParsedPacket packet) {
         if (!initialized.get()) {
             throw new IllegalStateException("LoadBalancer not initialized. Call init() first.");
@@ -83,29 +73,20 @@ public class LoadBalancerService {
 
         if (accepted) {
             dispatchedCount.incrementAndGet();
-            log.debug("Dispatched packet #{} to Worker-{}", packet.getSequenceNumber(), workerIndex);
         } else {
             dropCount.incrementAndGet();
             log.warn("Worker-{} queue full, dropping packet #{}", workerIndex, packet.getSequenceNumber());
         }
     }
 
-    /**
-     * Gracefully shut down all workers and the thread pool.
-     * Sends poison pills to each worker, then waits for termination.
-     */
     @PreDestroy
     public void shutdown() {
-        if (!initialized.get()) {
+        if (!initialized.get())
             return;
-        }
 
         log.info("Shutting down LoadBalancer...");
-
-        // Signal all workers to stop
-        for (WorkerService worker : workers) {
+        for (WorkerService worker : workers)
             worker.shutdown();
-        }
 
         executorService.shutdown();
         try {
@@ -132,30 +113,18 @@ public class LoadBalancerService {
         initialized.set(false);
     }
 
-    /**
-     * @return the array of workers (for stats/testing access)
-     */
     public WorkerService[] getWorkers() {
         return workers;
     }
 
-    /**
-     * @return total packets dispatched
-     */
     public long getDispatchedCount() {
         return dispatchedCount.get();
     }
 
-    /**
-     * @return total packets dropped due to full queues
-     */
     public long getDropCount() {
         return dropCount.get();
     }
 
-    /**
-     * @return whether the load balancer has been initialized
-     */
     public boolean isInitialized() {
         return initialized.get();
     }
