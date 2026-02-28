@@ -18,7 +18,7 @@ class DataCapRuleTest {
     void allowsUnderThreshold() {
         DataCapRule rule = new DataCapRule("test", 1000);
         ParsedPacket pkt = pkt(100);
-        Connection conn = new Connection("key", pkt); // 100 bytes
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt); // 100 bytes
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.ALLOW);
     }
@@ -28,7 +28,7 @@ class DataCapRuleTest {
     void throttlesOverThreshold() {
         DataCapRule rule = new DataCapRule("test", 1000);
         ParsedPacket pkt = pkt(100);
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         // Simulate growth to 1100 bytes
         for (int i = 0; i < 10; i++)
@@ -43,7 +43,7 @@ class DataCapRuleTest {
     void blocksOver2xThreshold() {
         DataCapRule rule = new DataCapRule("test", 1000);
         ParsedPacket pkt = pkt(100);
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         // Simulate growth to 2100 bytes
         for (int i = 0; i < 20; i++)

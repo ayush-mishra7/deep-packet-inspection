@@ -30,7 +30,7 @@ public class WorkerService implements Runnable {
     @Getter
     private final int workerId;
     private final LinkedBlockingQueue<ParsedPacket> queue;
-    private final Map<String, Connection> connections = new HashMap<>();
+    private final Map<com.ayush.dpi.connection.ConnectionKey, Connection> connections = new HashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final RuleRegistry ruleRegistry;
     private final com.ayush.dpi.stats.StatsService statsService;
@@ -94,7 +94,7 @@ public class WorkerService implements Runnable {
     }
 
     private void processPacket(ParsedPacket packet) {
-        String key = FiveTupleHasher.computeKey(packet);
+        com.ayush.dpi.connection.ConnectionKey key = FiveTupleHasher.computeKey(packet);
         totalProcessedCount.incrementAndGet();
 
         // Update connection tracking
@@ -102,7 +102,7 @@ public class WorkerService implements Runnable {
         if (conn == null) {
             conn = new Connection(key, packet);
             connections.put(key, conn);
-            log.debug("Worker-{} | NEW connection: {}", workerId, key);
+            log.trace("Worker-{} | NEW connection: {}", workerId, key);
         } else {
             conn.updateWith(packet);
         }
@@ -119,8 +119,9 @@ public class WorkerService implements Runnable {
             flushStats();
         }
 
+        // Decrease hotpath logging verbosity to debug to improve performance
         if (decision != Decision.ALLOW) {
-            log.info("Worker-{} | {} | connection={} | pkts={} bytes={}",
+            log.trace("Worker-{} | {} | connection={} | pkts={} bytes={}",
                     workerId, decision, key, conn.getPacketCount(), conn.getBytesTransferred());
         }
     }
@@ -148,7 +149,7 @@ public class WorkerService implements Runnable {
         return totalProcessedCount.get();
     }
 
-    public Map<String, Connection> getConnections() {
+    public Map<com.ayush.dpi.connection.ConnectionKey, Connection> getConnections() {
         return Collections.unmodifiableMap(connections);
     }
 

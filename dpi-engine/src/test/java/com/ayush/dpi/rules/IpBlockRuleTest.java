@@ -19,7 +19,7 @@ class IpBlockRuleTest {
     void blocksSrcIp() {
         IpBlockRule rule = new IpBlockRule("test", Set.of("10.0.0.1"));
         ParsedPacket pkt = pkt("10.0.0.1", "8.8.8.8");
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.BLOCK);
     }
@@ -29,7 +29,7 @@ class IpBlockRuleTest {
     void blocksDestIp() {
         IpBlockRule rule = new IpBlockRule("test", Set.of("8.8.8.8"));
         ParsedPacket pkt = pkt("10.0.0.1", "8.8.8.8");
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.BLOCK);
     }
@@ -39,7 +39,7 @@ class IpBlockRuleTest {
     void allowsNonBlockedIp() {
         IpBlockRule rule = new IpBlockRule("test", Set.of("192.168.1.1"));
         ParsedPacket pkt = pkt("10.0.0.1", "8.8.8.8");
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.ALLOW);
     }

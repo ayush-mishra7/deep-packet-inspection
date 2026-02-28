@@ -20,15 +20,13 @@ public final class FiveTupleHasher {
     }
 
     /**
-     * Compute a canonical string key from the five-tuple.
+     * Extract a deterministic key object from the five-tuple.
      *
      * @param packet the parsed packet
-     * @return a deterministic key string
+     * @return a ConnectionKey object
      */
-    public static String computeKey(ParsedPacket packet) {
-        return packet.getSrcIp() + ":" + packet.getSrcPort()
-                + "-" + packet.getDestIp() + ":" + packet.getDestPort()
-                + "-" + packet.getProtocol();
+    public static com.ayush.dpi.connection.ConnectionKey computeKey(ParsedPacket packet) {
+        return com.ayush.dpi.connection.ConnectionKey.from(packet);
     }
 
     /**
@@ -42,7 +40,7 @@ public final class FiveTupleHasher {
         if (workerCount <= 0) {
             throw new IllegalArgumentException("Worker count must be positive");
         }
-        String key = computeKey(packet);
+        com.ayush.dpi.connection.ConnectionKey key = computeKey(packet);
         // Use Math.abs with a bitwise AND to avoid Integer.MIN_VALUE edge case
         int hash = key.hashCode() & 0x7FFFFFFF;
         return hash % workerCount;

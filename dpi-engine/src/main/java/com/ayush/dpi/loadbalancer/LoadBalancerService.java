@@ -77,8 +77,11 @@ public class LoadBalancerService {
         if (accepted) {
             dispatchedCount.incrementAndGet();
         } else {
-            dropCount.incrementAndGet();
-            log.warn("Worker-{} queue full, dropping packet #{}", workerIndex, packet.getSequenceNumber());
+            long drops = dropCount.incrementAndGet();
+            if (drops % 10000 == 0) {
+                log.warn("Worker-{} queue full, dropping packet #{} (Total drops: {})", workerIndex,
+                        packet.getSequenceNumber(), drops);
+            }
         }
     }
 

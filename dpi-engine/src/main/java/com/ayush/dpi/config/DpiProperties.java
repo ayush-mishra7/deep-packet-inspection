@@ -58,8 +58,11 @@ public class DpiProperties {
     @Getter
     @Setter
     public static class Worker {
-        /** Number of worker threads in the processing pool. */
-        private int count = 4;
+        /**
+         * Number of worker threads in the processing pool, dynamically defaults to
+         * available procs.
+         */
+        private int count = Runtime.getRuntime().availableProcessors();
 
         /** Maximum capacity of each worker's packet queue. */
         private int queueCapacity = 10000;

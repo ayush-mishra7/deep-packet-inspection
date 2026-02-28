@@ -39,7 +39,7 @@ class WorkerServiceTest {
         thread.join(2000);
 
         assertThat(worker.getProcessedCount()).isEqualTo(5);
-        Map<String, Connection> connections = worker.getConnections();
+        Map<com.ayush.dpi.connection.ConnectionKey, Connection> connections = worker.getConnections();
         assertThat(connections).hasSize(2);
 
         // Verify first connection

@@ -18,12 +18,22 @@ import java.time.Instant;
 @Getter
 @ToString
 public class Connection {
+    @Getter
+    private final ConnectionKey key;
 
-    private final String fiveTupleKey;
+    @Getter
     private final String srcIp;
+
+    @Getter
     private final String destIp;
+
+    @Getter
     private final int srcPort;
+
+    @Getter
     private final int destPort;
+
+    @Getter
     private final ProtocolType protocol;
 
     private long bytesTransferred;
@@ -32,8 +42,8 @@ public class Connection {
     private Instant lastSeen;
     private Decision lastDecision = Decision.ALLOW;
 
-    public Connection(String fiveTupleKey, ParsedPacket initialPacket) {
-        this.fiveTupleKey = fiveTupleKey;
+    public Connection(ConnectionKey key, ParsedPacket initialPacket) {
+        this.key = key;
         this.srcIp = initialPacket.getSrcIp();
         this.destIp = initialPacket.getDestIp();
         this.srcPort = initialPacket.getSrcPort();

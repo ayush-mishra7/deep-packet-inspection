@@ -19,7 +19,7 @@ class DomainBlockRuleTest {
     void blocksExactDomain() {
         DomainBlockRule rule = new DomainBlockRule("test", Set.of("evil.com"));
         ParsedPacket pkt = pktWithSni("evil.com");
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.BLOCK);
     }
@@ -29,7 +29,7 @@ class DomainBlockRuleTest {
     void blocksWildcard() {
         DomainBlockRule rule = new DomainBlockRule("test", Set.of("*.example.com"));
         ParsedPacket pkt = pktWithSni("sub.example.com");
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.BLOCK);
     }
@@ -39,7 +39,7 @@ class DomainBlockRuleTest {
     void wildcardMatchesRoot() {
         DomainBlockRule rule = new DomainBlockRule("test", Set.of("*.example.com"));
         ParsedPacket pkt = pktWithSni("example.com");
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.BLOCK);
     }
@@ -49,7 +49,7 @@ class DomainBlockRuleTest {
     void allowsNonMatching() {
         DomainBlockRule rule = new DomainBlockRule("test", Set.of("evil.com"));
         ParsedPacket pkt = pktWithSni("good.com");
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.ALLOW);
     }
@@ -59,7 +59,7 @@ class DomainBlockRuleTest {
     void allowsNoSni() {
         DomainBlockRule rule = new DomainBlockRule("test", Set.of("evil.com"));
         ParsedPacket pkt = pktWithSni(null);
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.ALLOW);
     }
@@ -69,7 +69,7 @@ class DomainBlockRuleTest {
     void caseInsensitive() {
         DomainBlockRule rule = new DomainBlockRule("test", Set.of("Evil.COM"));
         ParsedPacket pkt = pktWithSni("evil.com");
-        Connection conn = new Connection("key", pkt);
+        Connection conn = new Connection(com.ayush.dpi.connection.ConnectionKey.from(pkt), pkt);
 
         assertThat(rule.evaluate(pkt, conn)).isEqualTo(Decision.BLOCK);
     }
