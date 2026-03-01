@@ -36,6 +36,7 @@ src/main/java/com/ayush/dpi/
 │   ├── HealthController.java        # GET /api/health — custom health with version & timestamp
 │   ├── StatsController.java         # GET /api/stats — aggregated packet statistics
 │   ├── RuleController.java          # CRUD /api/rules — dynamic rule management
+│   ├── BenchmarkController.java     # POST /api/benchmark/run — trigger synthetic traffic injection
 │   ├── GlobalExceptionHandler.java  # Centralized error handling
 │   └── dto/                         # Request/Response DTOs (RuleRequest, RuleResponse, etc.)
 ├── capture/
@@ -105,6 +106,8 @@ All properties are defined in `src/main/resources/application.yml` and can be ov
 | `GET` | `/api/rules` | List all active rules |
 | `POST` | `/api/rules` | Create rule (body: `{name, type, values?, threshold?}`) |
 | `DELETE` | `/api/rules/{name}` | Delete a rule by name |
+| `POST` | `/api/benchmark/run` | Trigger synthetic traffic injection (`?packets=500000&batchSize=1000`) |
+| `GET` | `/api/benchmark/status` | Check if a benchmark injection is currently running |
 | `WS` | `/ws/stats` | WebSocket — live stats broadcast every 1s |
 | `GET` | `/actuator/health` | Spring actuator health |
 | `GET` | `/actuator/info` | Application metadata |

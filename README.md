@@ -18,6 +18,23 @@ designed for real-time network traffic analysis, rule-based enforcement, and sca
 
 ---
 
+## 🖼️ Dashboard Preview
+
+<table>
+  <tr>
+    <td align="center"><img src="dashboard-screenshots/1.png" width="100%" alt="Dashboard Overview"/></td>
+    <td align="center"><img src="dashboard-screenshots/2.png" width="100%" alt="Dashboard Charts"/></td>
+    <td align="center"><img src="dashboard-screenshots/3.png" width="100%" alt="Dashboard Live Data"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Real-time stats overview with live packet counters and protocol breakdown</sub></td>
+    <td align="center"><sub>Throughput chart and decision pie chart showing ALLOW / BLOCK / THROTTLE</sub></td>
+    <td align="center"><sub>Top domains, traffic distribution, and live WebSocket data feed</sub></td>
+  </tr>
+</table>
+
+---
+
 ## 🌐 Overview
 
 The **DPI Engine** captures and analyzes network packets from PCAP files or synthetic traffic generators, extracts rich metadata (IP addresses, ports, protocols, TLS SNI), builds logical connections using five-tuple tracking, applies dynamic traffic rules (**ALLOW** / **BLOCK** / **THROTTLE**), and streams real-time analytics through WebSocket and REST APIs to a live React dashboard.
@@ -81,7 +98,7 @@ deep-packet-inspection/
 ├── dpi-engine/                      # Backend — Spring Boot application
 │   └── src/main/java/com/ayush/dpi/
 │       ├── DpiEngineApplication.java    # Entry point (@EnableScheduling, @EnableAsync)
-│       ├── api/                         # REST controllers (Health, Stats, Rules)
+│       ├── api/                         # REST controllers (Health, Stats, Rules, Benchmark)
 │       ├── capture/                     # Packet ingestion (PCAP files, synthetic traffic)
 │       ├── parser/                      # Raw bytes → ParsedPacket + SNI extraction
 │       ├── loadbalancer/                # Five-tuple hashing & worker dispatch
@@ -93,12 +110,15 @@ deep-packet-inspection/
 │       ├── websocket/                   # WebSocket handler (1s live broadcast)
 │       ├── analytics/                   # AI feature extraction (ML-ready)
 │       ├── persistence/                 # Async audit event publishing (JPA/Postgres)
+│       ├── benchmark/                    # SyntheticTrafficSimulator for load testing
 │       └── config/                      # DpiProperties, WebSocket, Resilience4j
 ├── dpi-dashboard/                   # Frontend — React 19 + Vite + Tailwind CSS 4
 │   └── src/
 │       ├── App.tsx                      # Main dashboard layout
 │       ├── components/                  # StatsCard, ThroughputChart, DecisionPieChart
 │       └── hooks/useDpiStats.ts         # WebSocket hook for live data
+├── dashboard-screenshots/           # Dashboard UI screenshots
+├── postman-tests/                   # API testing screenshots (Postman)
 ├── k8s/                             # Kubernetes manifests (Deployment + Service)
 ├── .github/workflows/ci.yml        # GitHub Actions CI pipeline
 ├── Dockerfile                       # Multi-stage build (Maven → JRE 17)
@@ -184,6 +204,8 @@ curl http://localhost:8080/actuator/info
 | `GET` | `/actuator/health` | Spring actuator health |
 | `GET` | `/actuator/info` | Application info metadata |
 | `GET` | `/actuator/prometheus` | Prometheus-format metrics scrape endpoint |
+| `POST` | `/api/benchmark/run` | Trigger synthetic traffic injection (params: `packets`, `batchSize`) |
+| `GET` | `/api/benchmark/status` | Check if a benchmark injection is currently running |
 | `WS` | `/ws/stats` | WebSocket — broadcasts live stats every 1 second |
 
 ### Dynamic Rule Management
@@ -223,19 +245,80 @@ curl http://localhost:8080/actuator/info
 }
 ```
 
+### API Testing (Postman)
+
+<table>
+  <tr>
+    <td align="center"><img src="postman-tests/1.png" width="100%" alt="Health Check"/></td>
+    <td align="center"><img src="postman-tests/2.png" width="100%" alt="Get Stats"/></td>
+    <td align="center"><img src="postman-tests/3.png" width="100%" alt="Create IP Block Rule"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>GET /api/health — Engine health check with version and uptime</sub></td>
+    <td align="center"><sub>GET /api/stats — Aggregated packet stats, protocols, and decisions</sub></td>
+    <td align="center"><sub>POST /api/rules — Creating an IP block rule</sub></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center"><img src="postman-tests/4.png" width="100%" alt="Domain Block Rule"/></td>
+    <td align="center"><img src="postman-tests/5.png" width="100%" alt="Data Cap Rule"/></td>
+    <td align="center"><img src="postman-tests/6.png" width="100%" alt="List Rules"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>POST /api/rules — Creating a domain block rule for evil.com</sub></td>
+    <td align="center"><sub>POST /api/rules — Creating a data cap rule with byte threshold</sub></td>
+    <td align="center"><sub>GET /api/rules — Listing all active rules</sub></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center"><img src="postman-tests/7.png" width="100%" alt="Delete Rule"/></td>
+    <td align="center"><img src="postman-tests/8.png" width="100%" alt="Actuator Health"/></td>
+    <td align="center"><img src="postman-tests/9.png" width="100%" alt="Actuator Info"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>DELETE /api/rules/{name} — Removing a rule by name</sub></td>
+    <td align="center"><sub>GET /actuator/health — Spring Actuator health endpoint</sub></td>
+    <td align="center"><sub>GET /actuator/info — Application metadata and build info</sub></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="postman-tests/10.png" width="100%" alt="Prometheus Metrics"/></td>
+    <td width="33%"></td>
+    <td width="33%"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>GET /actuator/prometheus — Prometheus-format metrics scrape</sub></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
+
 ---
 
 ## 📊 Real-time Dashboard
 
-The **dpi-dashboard** is a React 19 single-page application that connects to the engine's WebSocket endpoint and visualizes:
+The **dpi-dashboard** is a React 19 single-page application that connects to the engine's WebSocket endpoint and visualizes live traffic analytics. See the [screenshots at the top](#️-dashboard-preview) for a look at the running dashboard.
 
-- **Throughput** — Packets per second over time (line chart)
-- **Decision Distribution** — ALLOW / BLOCK / THROTTLE breakdown (pie chart)
-- **Protocol Ratio** — TCP vs UDP traffic split
-- **Top Domains** — Most frequently seen SNI domains
-- **Live Counters** — Total packets, bytes processed, active rules
+- **Throughput** — Packets per second over time (area chart with gradient fill)
+- **Decision Distribution** — ALLOW / BLOCK / THROTTLE breakdown (animated pie chart)
+- **Protocol Ratio** — TCP vs UDP traffic split with percentage indicators
+- **Top Domains** — Most frequently seen SNI domains ranked by frequency
+- **Live Counters** — Total packets, bytes processed, active connections
 
-The dashboard updates every second with zero polling — all data is pushed via WebSocket.
+The dashboard updates every second with zero polling — all data is pushed via WebSocket from the engine's `/ws/stats` endpoint.
+
+```bash
+cd dpi-dashboard
+npm install
+npm run dev
+# Opens at http://localhost:5173
+```
 
 ---
 
